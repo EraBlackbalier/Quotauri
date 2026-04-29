@@ -1,0 +1,307 @@
+use crate::db::Db;
+use handlebars::Handlebars;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use sqlx::{FromRow, SqlitePool};
+use tauri::State;
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct Template {
+    pub id: i64,
+    pub name: String,
+    pub logo_path: Option<String>,
+    pub logo_data_url: Option<String>,
+    pub accent_color: Option<String>,
+    pub header_html: Option<String>,
+    pub body_html: Option<String>,
+    pub footer_html: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TemplateUpsertInput {
+    pub name: String,
+    pub logo_path: Option<String>,
+    pub logo_data_url: Option<String>,
+    pub accent_color: Option<String>,
+    pub header_html: Option<String>,
+    pub body_html: Option<String>,
+    pub footer_html: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RenderTemplateInput {
+    pub name: Option<String>,
+    pub logo_data_url: Option<String>,
+    pub accent_color: Option<String>,
+    pub header_html: Option<String>,
+    pub body_html: Option<String>,
+    pub footer_html: Option<String>,
+    pub variables: Value,
+}
+
+async fn fetch_template(pool: &SqlitePool, id: i64) -> Result<Template, String> {
+    sqlx::query_as::<_, Template>(
+        r#"
+SELECT id,
+       name,
+       logo_path,
+       logo_data_url,
+       accent_color,
+       header_html,
+       body_html,
+       footer_html,
+       created_at,
+       updated_at
+FROM templates
+WHERE id = ?1
+"#,
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())
+}
+
+fn render_html(input: RenderTemplateInput) -> Result<String, String> {
+    let accent = input.accent_color.unwrap_or_else(|| "#396cd8".to_string());
+
+    let mut variables = input.variables;
+    if variables.is_null() {
+        variables = Value::Object(serde_json::Map::new());
+    }
+
+    let hb = Handlebars::new();
+
+    let header_raw = input.header_html.unwrap_or_default();
+    let body_raw = input.body_html.unwrap_or_default();
+    let footer_raw = input.footer_html.unwrap_or_default();
+
+    let header = hb
+        .render_template(&header_raw, &variables)
+        .map_err(|e| e.to_string())?;
+    let body = hb
+        .render_template(&body_raw, &variables)
+        .map_err(|e| e.to_string())?;
+    let footer = hb
+        .render_template(&footer_raw, &variables)
+        .map_err(|e| e.to_string())?;
+
+    let logo_html = if let Some(data_url) = input.logo_data_url {
+        if data_url.trim().is_empty() {
+            String::new()
+        } else {
+            format!(
+                r#"<div class=\"logo\"><img src=\"{}\" alt=\"logo\" /></div>"#,
+                html_escape(&data_url)
+            )
+        }
+    } else {
+        String::new()
+    };
+
+    let title = input.name.unwrap_or_else(|| "Template".to_string());
+
+    Ok(format!(
+        r#"<!doctype html>
+<html>
+<head>
+  <meta charset=\"utf-8\" />
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+  <title>{}</title>
+  <style>
+    :root {{ --accent: {}; }}
+    body {{ margin: 0; font-family: Inter, Arial, sans-serif; background: #f3f4f6; color: #111827; }}
+    .page {{ width: 800px; max-width: calc(100vw - 48px); margin: 24px auto; background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 12px; overflow: hidden; }}
+    .header {{ padding: 24px; border-bottom: 4px solid var(--accent); display: flex; gap: 16px; align-items: flex-start; }}
+    .logo img {{ max-height: 52px; max-width: 220px; object-fit: contain; }}
+    .header-content {{ flex: 1; min-width: 0; }}
+    .body {{ padding: 24px; }}
+    .footer {{ padding: 16px 24px; border-top: 1px solid rgba(0,0,0,0.08); color: rgba(17,24,39,0.75); }}
+    table {{ width: 100%; border-collapse: collapse; }}
+    th, td {{ padding: 8px; border-bottom: 1px solid rgba(0,0,0,0.08); text-align: left; }}
+  </style>
+</head>
+<body>
+  <div class=\"page\">
+    <div class=\"header\">{}
+      <div class=\"header-content\">{}</div>
+    </div>
+    <div class=\"body\">{}</div>
+    <div class=\"footer\">{}</div>
+  </div>
+</body>
+</html>"#,
+        html_escape(&title),
+        html_escape(&accent),
+        logo_html,
+        header,
+        body,
+        footer
+    ))
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+#[tauri::command]
+pub async fn list_templates(db: State<'_, Db>, search: Option<String>) -> Result<Vec<Template>, String> {
+    let pool = &db.0;
+
+    if let Some(search) = search {
+        let pattern = format!("%{}%", search);
+        sqlx::query_as::<_, Template>(
+            r#"
+SELECT id,
+       name,
+       logo_path,
+       logo_data_url,
+       accent_color,
+       header_html,
+       body_html,
+       footer_html,
+       created_at,
+       updated_at
+FROM templates
+WHERE name LIKE ?1
+ORDER BY updated_at DESC
+LIMIT 200
+"#,
+        )
+        .bind(pattern)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())
+    } else {
+        sqlx::query_as::<_, Template>(
+            r#"
+SELECT id,
+       name,
+       logo_path,
+       logo_data_url,
+       accent_color,
+       header_html,
+       body_html,
+       footer_html,
+       created_at,
+       updated_at
+FROM templates
+ORDER BY updated_at DESC
+LIMIT 200
+"#,
+        )
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn get_template(db: State<'_, Db>, id: i64) -> Result<Template, String> {
+    let pool = &db.0;
+    fetch_template(pool, id).await
+}
+
+#[tauri::command]
+pub async fn create_template(db: State<'_, Db>, input: TemplateUpsertInput) -> Result<Template, String> {
+    let pool = &db.0;
+
+    let res = sqlx::query(
+        r#"
+INSERT INTO templates (
+  name,
+  logo_path,
+  logo_data_url,
+  accent_color,
+  header_html,
+  body_html,
+  footer_html,
+  created_at,
+  updated_at
+)
+VALUES (
+  ?1, ?2, ?3, ?4, ?5, ?6, ?7,
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+)
+"#,
+    )
+    .bind(input.name)
+    .bind(input.logo_path)
+    .bind(input.logo_data_url)
+    .bind(input.accent_color)
+    .bind(input.header_html)
+    .bind(input.body_html)
+    .bind(input.footer_html)
+    .execute(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let id = res.last_insert_rowid();
+    fetch_template(pool, id).await
+}
+
+#[tauri::command]
+pub async fn update_template(
+    db: State<'_, Db>,
+    id: i64,
+    input: TemplateUpsertInput,
+) -> Result<Template, String> {
+    let pool = &db.0;
+
+    sqlx::query(
+        r#"
+UPDATE templates
+SET name = ?1,
+    logo_path = ?2,
+    logo_data_url = ?3,
+    accent_color = ?4,
+    header_html = ?5,
+    body_html = ?6,
+    footer_html = ?7,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?8
+"#,
+    )
+    .bind(input.name)
+    .bind(input.logo_path)
+    .bind(input.logo_data_url)
+    .bind(input.accent_color)
+    .bind(input.header_html)
+    .bind(input.body_html)
+    .bind(input.footer_html)
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    fetch_template(pool, id).await
+}
+
+#[tauri::command]
+pub async fn delete_template(db: State<'_, Db>, id: i64) -> Result<(), String> {
+    let pool = &db.0;
+
+    sqlx::query(
+        r#"
+DELETE FROM templates
+WHERE id = ?1
+"#,
+    )
+    .bind(id)
+    .execute(pool)
+    .await
+    .map(|_| ())
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn render_template_preview(input: RenderTemplateInput) -> Result<String, String> {
+    render_html(input)
+}
