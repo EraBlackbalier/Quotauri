@@ -120,13 +120,21 @@ WHERE template_id = ?1
 
 pub(crate) fn render_html(input: RenderTemplateInput) -> Result<String, String> {
     let accent = input.accent_color.unwrap_or_else(|| "#396cd8".to_string());
+    let logo_data_url = input.logo_data_url.unwrap_or_default();
+    let title = input.name.unwrap_or_else(|| "Quotauri".to_string());
 
     let mut variables = input.variables;
     if variables.is_null() {
         variables = Value::Object(serde_json::Map::new());
     }
+    if let Value::Object(map) = &mut variables {
+        map.insert("accent_color".to_string(), Value::String(accent.clone()));
+        map.insert("logo_data_url".to_string(), Value::String(logo_data_url));
+        map.insert("title".to_string(), Value::String(title.clone()));
+    }
 
-    let hb = Handlebars::new();
+    let mut hb = Handlebars::new();
+    hb.register_escape_fn(handlebars::no_escape);
 
     let header_raw = input.header_html.unwrap_or_default();
     let body_raw = input.body_html.unwrap_or_default();
@@ -142,57 +150,33 @@ pub(crate) fn render_html(input: RenderTemplateInput) -> Result<String, String> 
         .render_template(&footer_raw, &variables)
         .map_err(|e| e.to_string())?;
 
-    let logo_html = if let Some(data_url) = input.logo_data_url {
-        if data_url.trim().is_empty() {
-            String::new()
-        } else {
-            format!(
-                r#"<div class=\"logo\"><img src=\"{}\" alt=\"logo\" /></div>"#,
-                html_escape(&data_url)
-            )
-        }
-    } else {
-        String::new()
-    };
-
-    let title = input.name.unwrap_or_else(|| "Template".to_string());
-
     Ok(format!(
         r#"<!doctype html>
 <html>
 <head>
-  <meta charset=\"utf-8\" />
-  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-  <title>{}</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title>
   <style>
-    :root {{ --accent: {}; }}
-    body {{ margin: 0; font-family: Inter, Arial, sans-serif; background: #f3f4f6; color: #111827; }}
-    .page {{ width: 800px; max-width: calc(100vw - 48px); margin: 24px auto; background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 12px; overflow: hidden; }}
-    .header {{ padding: 24px; border-bottom: 4px solid var(--accent); display: flex; gap: 16px; align-items: flex-start; }}
-    .logo img {{ max-height: 52px; max-width: 220px; object-fit: contain; }}
-    .header-content {{ flex: 1; min-width: 0; }}
-    .body {{ padding: 24px; }}
-    .footer {{ padding: 16px 24px; border-top: 1px solid rgba(0,0,0,0.08); color: rgba(17,24,39,0.75); }}
-    table {{ width: 100%; border-collapse: collapse; }}
-    th, td {{ padding: 8px; border-bottom: 1px solid rgba(0,0,0,0.08); text-align: left; }}
+    @page {{ size: A4; margin: 0; }}
+    * {{ box-sizing: border-box; }}
+    body {{ margin: 0; padding: 0; font-family: 'Segoe UI', Inter, Arial, sans-serif; color: #1a1a2e; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+    .page {{ width: 210mm; min-height: 297mm; margin: 0 auto; position: relative; overflow: hidden; }}
+    @media screen {{ .page {{ border: 1px solid #ddd; margin: 20px auto; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }} }}
   </style>
 </head>
 <body>
-  <div class=\"page\">
-    <div class=\"header\">{}
-      <div class=\"header-content\">{}</div>
-    </div>
-    <div class=\"body\">{}</div>
-    <div class=\"footer\">{}</div>
+  <div class="page">
+    {header}
+    {body}
+    {footer}
   </div>
 </body>
 </html>"#,
-        html_escape(&title),
-        html_escape(&accent),
-        logo_html,
-        header,
-        body,
-        footer
+        title = html_escape(&title),
+        header = header,
+        body = body,
+        footer = footer
     ))
 }
 

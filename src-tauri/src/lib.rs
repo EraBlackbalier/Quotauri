@@ -2,6 +2,7 @@
 mod db;
 mod products;
 mod quotes;
+mod seed_templates;
 mod settings;
 mod templates;
 
@@ -41,6 +42,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             list_products,

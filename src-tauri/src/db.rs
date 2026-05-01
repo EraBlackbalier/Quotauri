@@ -172,6 +172,41 @@ CREATE TABLE IF NOT EXISTS quote_items (
         .await
         .context("failed to create idx_quote_items_quote_id index")?;
 
+    seed_default_templates(pool).await?;
+
+    Ok(())
+}
+
+async fn seed_default_templates(pool: &SqlitePool) -> anyhow::Result<()> {
+    let seeds = crate::seed_templates::default_templates();
+    for tpl in seeds {
+        let exists: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM templates WHERE name = ?1")
+                .bind(tpl.name)
+                .fetch_one(pool)
+                .await
+                .context("failed to check template existence")?;
+
+        if exists.0 > 0 {
+            continue;
+        }
+
+        sqlx::query(
+            r#"
+INSERT INTO templates (name, accent_color, header_html, body_html, footer_html, created_at, updated_at)
+VALUES (?1, ?2, ?3, ?4, ?5, strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+"#,
+        )
+        .bind(tpl.name)
+        .bind(tpl.accent_color)
+        .bind(tpl.header_html)
+        .bind(tpl.body_html)
+        .bind(tpl.footer_html)
+        .execute(pool)
+        .await
+        .context("failed to seed default template")?;
+    }
+
     Ok(())
 }
 

@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import DataTable from "../components/DataTable.vue";
 import ProductAutocomplete from "../components/ProductAutocomplete.vue";
-import { save } from "@tauri-apps/api/dialog";
+import { save } from "@tauri-apps/plugin-dialog";
 import { open } from "@tauri-apps/plugin-opener";
 import { language, t } from "../i18n";
 

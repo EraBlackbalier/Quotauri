@@ -28,13 +28,22 @@ const templateVariablesJson = ref(
   JSON.stringify(
     {
       quote: {
-        quote_number: "Q-000001",
-        customer_name: "Cliente de ejemplo",
-        subtotal: "1000.00",
-        tax: "160.00",
-        total: "1160.00",
+        quote_number_display: "Q-000001",
+        customer_name: "Empresa Demo S.A. de C.V.",
+        customer_email: "contacto@empresa-demo.mx",
+        notes: "Cotización válida por 30 días.",
+        status: "draft",
+        created_at: new Date().toISOString().split("T")[0],
+        subtotal: "10,000.00",
+        tax: "1,600.00",
+        total: "11,600.00",
         currency: "MXN",
       },
+      items: [
+        { name: "Servicio de consultoría", sku: "SRV-001", description: "Asesoría técnica especializada", quantity: 2, unit_price: "3,500.00", line_total: "7,000.00", currency: "MXN" },
+        { name: "Licencia de software", sku: "LIC-042", description: "Licencia anual premium", quantity: 1, unit_price: "2,500.00", line_total: "2,500.00", currency: "MXN" },
+        { name: "Soporte técnico", sku: "SUP-010", description: null, quantity: 1, unit_price: "500.00", line_total: "500.00", currency: "MXN" },
+      ],
     },
     null,
     2
@@ -66,10 +75,9 @@ function resetTemplateForm() {
   templateForm.value = {
     name: "",
     accent_color: "#396cd8",
-    header_html: "<h2>Cotización {{quote.quote_number}}</h2><div>{{quote.customer_name}}</div>",
-    body_html:
-      "<p>Subtotal: {{quote.currency}} {{quote.subtotal}}</p><p>Impuestos: {{quote.currency}} {{quote.tax}}</p><h3>Total: {{quote.currency}} {{quote.total}}</h3>",
-    footer_html: "<small>Gracias por tu preferencia</small>",
+    header_html: "",
+    body_html: "",
+    footer_html: "",
     logo_data_url: "",
   };
 
@@ -188,13 +196,13 @@ async function saveTemplate() {
   }
 }
 
-async function removeTemplate(t) {
-  if (!confirm(t("templates.deleteConfirm", t.name))) return;
+async function removeTemplate(tpl) {
+  if (!confirm(t("templates.deleteConfirm", tpl.name))) return;
   templateLoading.value = true;
   templateErrorMsg.value = "";
   try {
-    await invoke("delete_template", { id: t.id });
-    if (templateEditingId.value === t.id) resetTemplateForm();
+    await invoke("delete_template", { id: tpl.id });
+    if (templateEditingId.value === tpl.id) resetTemplateForm();
     await refreshTemplates();
   } catch (e) {
     templateErrorMsg.value = String(e);

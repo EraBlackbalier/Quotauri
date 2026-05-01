@@ -112,8 +112,8 @@ fn file_url_from_path(p: &std::path::Path) -> String {
 
 fn find_edge_exe() -> Option<std::path::PathBuf> {
     let candidates = [
-        r#"C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe"#,
-        r#"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"#,
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     ];
 
     for c in candidates {
@@ -297,6 +297,8 @@ pub async fn export_quote_pdf(
             .arg("--disable-gpu")
             .arg(format!("--print-to-pdf={}", out.to_string_lossy()))
             .arg("--no-pdf-header-footer")
+            .arg("--print-to-pdf-no-header")
+            .arg("--run-all-compositor-stages-before-draw")
             .arg(url)
             .status()
     })
