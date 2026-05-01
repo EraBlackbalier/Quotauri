@@ -8,6 +8,8 @@ const props = defineProps({
   minChars: { type: Number, default: 1 },
   debounceMs: { type: Number, default: 250 },
   clearOnSelect: { type: Boolean, default: true },
+  loadingText: { type: String, default: "Buscando..." },
+  emptyText: { type: String, default: "Sin resultados." },
 });
 
 const emit = defineEmits(["select"]);
@@ -86,8 +88,8 @@ onUnmounted(() => {
 
     <div v-if="open" class="pa-panel">
       <div v-if="error" class="error" style="margin: 8px">{{ error }}</div>
-      <div v-else-if="loading" class="muted" style="padding: 8px 10px">Buscando...</div>
-      <div v-else-if="!results.length" class="muted" style="padding: 8px 10px">Sin resultados.</div>
+      <div v-else-if="loading" class="muted" style="padding: 8px 10px">{{ loadingText }}</div>
+      <div v-else-if="!results.length" class="muted" style="padding: 8px 10px">{{ emptyText }}</div>
       <button v-for="p in results" :key="`pa-${p.id}`" class="pa-item" type="button" @click="pick(p)">
         <div class="pa-title">
           <span>{{ p.name }}</span>

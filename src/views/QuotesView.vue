@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import DataTable from "../components/DataTable.vue";
 import ProductAutocomplete from "../components/ProductAutocomplete.vue";
+import { t } from "../i18n";
 
 const quoteLoading = ref(false);
 const quoteErrorMsg = ref("");
@@ -23,18 +24,18 @@ const quoteForm = ref({
 
 const quoteItems = ref([]);
 
-const quoteColumns = [
-  { key: "folio", label: "Folio", width: "150px" },
-  { key: "customer", label: "Cliente" },
-  { key: "total", label: "Total", width: "160px" },
-];
+const quoteColumns = computed(() => [
+  { key: "folio", label: t("quotes.folio"), width: "150px" },
+  { key: "customer", label: t("quotes.customer") },
+  { key: "total", label: t("quotes.total"), width: "160px" },
+]);
 
-const quoteItemColumns = [
-  { key: "name", label: "Producto" },
-  { key: "qty", label: "Cant.", width: "90px" },
-  { key: "unit", label: "Precio", width: "160px" },
-  { key: "line", label: "Total", width: "160px" },
-];
+const quoteItemColumns = computed(() => [
+  { key: "name", label: t("products.name") },
+  { key: "qty", label: t("quotes.qty"), width: "90px" },
+  { key: "unit", label: t("products.price"), width: "160px" },
+  { key: "line", label: t("quotes.total"), width: "160px" },
+]);
 
 function formatMoney(cents) {
   const v = Number(cents || 0) / 100;
@@ -118,7 +119,7 @@ async function saveQuote() {
   quoteErrorMsg.value = "";
   try {
     if (!quoteItems.value.length) {
-      quoteErrorMsg.value = "Agrega al menos un producto";
+      quoteErrorMsg.value = t("quotes.addAtLeastOne");
       return;
     }
 
@@ -164,13 +165,13 @@ onMounted(async () => {
   <section>
     <div class="app-header">
       <div>
-        <h1>Cotizaciones</h1>
-        <p class="muted">Arma una cotización, guárdala y consulta el historial.</p>
+        <h1>{{ t("quotes.title") }}</h1>
+        <p class="muted">{{ t("quotes.subtitle") }}</p>
       </div>
 
       <div class="header-actions">
-        <input v-model="quoteSearch" class="search" placeholder="Buscar por folio o cliente" @input="refreshQuotes" />
-        <button type="button" @click="refreshQuotes" :disabled="quoteLoading">Refrescar</button>
+        <input v-model="quoteSearch" class="search" :placeholder="t('quotes.searchPlaceholder')" @input="refreshQuotes" />
+        <button type="button" @click="refreshQuotes" :disabled="quoteLoading">{{ t("common.refresh") }}</button>
       </div>
     </div>
 
@@ -178,50 +179,52 @@ onMounted(async () => {
 
     <div class="grid-quotes">
       <section class="card">
-        <div class="card-title">Nueva cotización</div>
+        <div class="card-title">{{ t("quotes.newTitle") }}</div>
 
         <form class="form" @submit.prevent="saveQuote">
           <div class="row-2">
             <label>
-              Folio
+              {{ t("quotes.folio") }}
               <input v-model="quoteForm.quote_number" placeholder="(auto si vacío)" />
             </label>
 
             <label>
-              Impuesto (bps)
+              {{ t("quotes.taxBps") }}
               <input v-model.number="quoteForm.tax_rate_bps" type="number" min="0" />
             </label>
           </div>
 
           <div class="row-2">
             <label>
-              Cliente
-              <input v-model="quoteForm.customer_name" placeholder="Opcional" />
+              {{ t("quotes.customer") }}
+              <input v-model="quoteForm.customer_name" :placeholder="t('products.skuOptional')" />
             </label>
             <label>
-              Email
-              <input v-model="quoteForm.customer_email" placeholder="Opcional" />
+              {{ t("quotes.email") }}
+              <input v-model="quoteForm.customer_email" :placeholder="t('products.skuOptional')" />
             </label>
           </div>
 
           <label>
-            Notas
-            <textarea v-model="quoteForm.notes" rows="3" placeholder="Opcional" />
+            {{ t("quotes.notes") }}
+            <textarea v-model="quoteForm.notes" rows="3" :placeholder="t('products.skuOptional')" />
           </label>
 
           <div class="row-2">
             <label>
-              Moneda
+              {{ t("products.currency") }}
               <input v-model="quoteForm.currency" placeholder="MXN" />
             </label>
             <div></div>
           </div>
 
-          <div class="card-title" style="margin-top: 8px">Agregar productos</div>
+          <div class="card-title" style="margin-top: 8px">{{ t("quotes.addProducts") }}</div>
 
           <ProductAutocomplete
             :disabled="quoteLoading"
-            placeholder="Buscar productos para agregar"
+            :placeholder="t('quotes.productSearch')"
+            :loading-text="t('common.searching')"
+            :empty-text="t('common.noResults')"
             @select="addProductToQuote"
           />
 
@@ -237,52 +240,53 @@ onMounted(async () => {
 
               <div class="quote-item-edit">
                 <label>
-                  Cant.
+                  {{ t("quotes.qty") }}
                   <input v-model.number="it.quantity" type="number" min="1" />
                 </label>
                 <label>
-                  Precio (centavos)
+                  {{ t("quotes.unitPriceCents") }}
                   <input v-model.number="it.unit_price_cents" type="number" min="0" />
                 </label>
                 <label>
-                  Total
+                  {{ t("quotes.total") }}
                   <input :value="formatMoney((it.quantity || 0) * (it.unit_price_cents || 0))" disabled />
                 </label>
-                <button type="button" class="danger" @click="removeQuoteItem(idx)">Quitar</button>
+                <button type="button" class="danger" @click="removeQuoteItem(idx)">{{ t("quotes.remove") }}</button>
               </div>
             </div>
           </div>
 
           <div class="totals">
             <div class="totals-row">
-              <div class="muted">Subtotal</div>
+              <div class="muted">{{ t("quotes.subtotal") }}</div>
               <div>{{ quoteForm.currency }} {{ formatMoney(quoteSubtotalCents) }}</div>
             </div>
             <div class="totals-row">
-              <div class="muted">Impuestos</div>
+              <div class="muted">{{ t("quotes.taxes") }}</div>
               <div>{{ quoteForm.currency }} {{ formatMoney(quoteTaxCents) }}</div>
             </div>
             <div class="totals-row total">
-              <div>Total</div>
+              <div>{{ t("quotes.total") }}</div>
               <div>{{ quoteForm.currency }} {{ formatMoney(quoteTotalCents) }}</div>
             </div>
           </div>
 
           <div class="actions">
-            <button type="submit" :disabled="quoteLoading">Guardar cotización</button>
-            <button type="button" class="secondary" @click="resetQuoteBuilder" :disabled="quoteLoading">Limpiar</button>
+            <button type="submit" :disabled="quoteLoading">{{ t("quotes.saveQuote") }}</button>
+            <button type="button" class="secondary" @click="resetQuoteBuilder" :disabled="quoteLoading">{{ t("common.clear") }}</button>
           </div>
         </form>
       </section>
 
       <section class="card">
-        <div class="card-title">Guardadas</div>
+        <div class="card-title">{{ t("quotes.savedTitle") }}</div>
 
         <DataTable
           :columns="quoteColumns"
           :rows="quotes"
           :loading="quoteLoading"
-          empty-text="No hay cotizaciones."
+          :loading-text="t('common.loading')"
+          :empty-text="t('quotes.empty')"
           clickable
           row-key="id"
           :selected-key="selectedQuoteId"
@@ -295,7 +299,7 @@ onMounted(async () => {
             </div>
           </template>
 
-          <template #cell-customer="{ row }">{{ row.customer_name || "(sin cliente)" }}</template>
+          <template #cell-customer="{ row }">{{ row.customer_name || t("quotes.withoutCustomer") }}</template>
 
           <template #cell-total="{ row }">
             {{ row.currency }} {{ formatMoney(row.total_cents) }}
@@ -304,25 +308,31 @@ onMounted(async () => {
       </section>
 
       <section class="card" v-if="selectedQuote">
-        <div class="card-title">Detalle</div>
+        <div class="card-title">{{ t("quotes.detailTitle") }}</div>
 
         <div class="detail">
           <div class="detail-row">
-            <div class="muted">Folio</div>
+            <div class="muted">{{ t("quotes.folio") }}</div>
             <div>{{ selectedQuote.quote.quote_number || `Q-${selectedQuote.quote.id}` }}</div>
           </div>
           <div class="detail-row">
-            <div class="muted">Cliente</div>
-            <div>{{ selectedQuote.quote.customer_name || "(sin cliente)" }}</div>
+            <div class="muted">{{ t("quotes.customer") }}</div>
+            <div>{{ selectedQuote.quote.customer_name || t("quotes.withoutCustomer") }}</div>
           </div>
           <div class="detail-row">
-            <div class="muted">Email</div>
+            <div class="muted">{{ t("quotes.email") }}</div>
             <div>{{ selectedQuote.quote.customer_email || "" }}</div>
           </div>
         </div>
 
         <div style="margin-top: 10px">
-          <DataTable :columns="quoteItemColumns" :rows="selectedQuote.items" :loading="quoteLoading" empty-text="Sin items.">
+          <DataTable
+            :columns="quoteItemColumns"
+            :rows="selectedQuote.items"
+            :loading="quoteLoading"
+            :loading-text="t('common.loading')"
+            :empty-text="t('quotes.emptyItems')"
+          >
             <template #cell-name="{ row }">
               <div class="item-title">
                 {{ row.name }}
@@ -341,15 +351,15 @@ onMounted(async () => {
 
         <div class="totals" style="margin-top: 10px">
           <div class="totals-row">
-            <div class="muted">Subtotal</div>
+            <div class="muted">{{ t("quotes.subtotal") }}</div>
             <div>{{ selectedQuote.quote.currency }} {{ formatMoney(selectedQuote.quote.subtotal_cents) }}</div>
           </div>
           <div class="totals-row">
-            <div class="muted">Impuestos</div>
+            <div class="muted">{{ t("quotes.taxes") }}</div>
             <div>{{ selectedQuote.quote.currency }} {{ formatMoney(selectedQuote.quote.tax_cents) }}</div>
           </div>
           <div class="totals-row total">
-            <div>Total</div>
+            <div>{{ t("quotes.total") }}</div>
             <div>{{ selectedQuote.quote.currency }} {{ formatMoney(selectedQuote.quote.total_cents) }}</div>
           </div>
         </div>

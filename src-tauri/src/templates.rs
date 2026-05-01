@@ -19,6 +19,20 @@ pub struct Template {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct TemplateTranslation {
+    pub id: i64,
+    pub template_id: i64,
+    pub lang_code: String,
+    pub name: Option<String>,
+    pub header_html: Option<String>,
+    pub body_html: Option<String>,
+    pub footer_html: Option<String>,
+    pub variables_json: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct TemplateUpsertInput {
     pub name: String,
@@ -28,6 +42,17 @@ pub struct TemplateUpsertInput {
     pub header_html: Option<String>,
     pub body_html: Option<String>,
     pub footer_html: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TemplateTranslationUpsertInput {
+    pub template_id: i64,
+    pub lang_code: String,
+    pub name: Option<String>,
+    pub header_html: Option<String>,
+    pub body_html: Option<String>,
+    pub footer_html: Option<String>,
+    pub variables_json: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -60,6 +85,35 @@ WHERE id = ?1
     )
     .bind(id)
     .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())
+}
+
+async fn fetch_template_translation(
+    pool: &SqlitePool,
+    template_id: i64,
+    lang_code: &str,
+) -> Result<Option<TemplateTranslation>, String> {
+    sqlx::query_as::<_, TemplateTranslation>(
+        r#"
+SELECT id,
+       template_id,
+       lang_code,
+       name,
+       header_html,
+       body_html,
+       footer_html,
+       variables_json,
+       created_at,
+       updated_at
+FROM template_translations
+WHERE template_id = ?1
+  AND lang_code = ?2
+"#,
+    )
+    .bind(template_id)
+    .bind(lang_code)
+    .fetch_optional(pool)
     .await
     .map_err(|e| e.to_string())
 }
@@ -299,6 +353,71 @@ WHERE id = ?1
     .await
     .map(|_| ())
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_template_translation(
+    db: State<'_, Db>,
+    template_id: i64,
+    lang_code: String,
+) -> Result<Option<TemplateTranslation>, String> {
+    let pool = &db.0;
+    fetch_template_translation(pool, template_id, &lang_code).await
+}
+
+#[tauri::command]
+pub async fn upsert_template_translation(
+    db: State<'_, Db>,
+    input: TemplateTranslationUpsertInput,
+) -> Result<TemplateTranslation, String> {
+    let pool = &db.0;
+
+    let code = input.lang_code.trim().to_lowercase();
+    if code.is_empty() {
+        return Err("lang_code is required".to_string());
+    }
+
+    sqlx::query(
+        r#"
+INSERT INTO template_translations (
+  template_id,
+  lang_code,
+  name,
+  header_html,
+  body_html,
+  footer_html,
+  variables_json,
+  created_at,
+  updated_at
+)
+VALUES (
+  ?1, ?2, ?3, ?4, ?5, ?6, ?7,
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+)
+ON CONFLICT(template_id, lang_code)
+DO UPDATE SET
+  name = excluded.name,
+  header_html = excluded.header_html,
+  body_html = excluded.body_html,
+  footer_html = excluded.footer_html,
+  variables_json = excluded.variables_json,
+  updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+"#,
+    )
+    .bind(input.template_id)
+    .bind(&code)
+    .bind(input.name)
+    .bind(input.header_html)
+    .bind(input.body_html)
+    .bind(input.footer_html)
+    .bind(input.variables_json)
+    .execute(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let saved = fetch_template_translation(pool, input.template_id, &code).await?;
+    saved.ok_or_else(|| "failed to fetch template translation".to_string())
 }
 
 #[tauri::command]

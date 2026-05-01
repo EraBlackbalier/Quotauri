@@ -81,6 +81,44 @@ CREATE TABLE IF NOT EXISTS templates (
 
     sqlx::query(
         r#"
+CREATE TABLE IF NOT EXISTS template_translations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  template_id INTEGER NOT NULL,
+  lang_code TEXT NOT NULL,
+  name TEXT,
+  header_html TEXT,
+  body_html TEXT,
+  footer_html TEXT,
+  variables_json TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  UNIQUE(template_id, lang_code),
+  FOREIGN KEY (template_id) REFERENCES templates (id) ON DELETE CASCADE
+);
+"#,
+    )
+    .execute(pool)
+    .await
+    .context("failed to create template_translations table")?;
+
+    ensure_template_translations_columns(pool).await?;
+
+    sqlx::query(
+        r#"
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+"#,
+    )
+    .execute(pool)
+    .await
+    .context("failed to create settings table")?;
+
+    sqlx::query(
+        r#"
 CREATE TABLE IF NOT EXISTS quotes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   quote_number TEXT,
@@ -133,6 +171,43 @@ CREATE TABLE IF NOT EXISTS quote_items (
         .execute(pool)
         .await
         .context("failed to create idx_quote_items_quote_id index")?;
+
+    Ok(())
+}
+
+async fn ensure_template_translations_columns(pool: &SqlitePool) -> anyhow::Result<()> {
+    use sqlx::Row;
+
+    let rows = sqlx::query("PRAGMA table_info(template_translations);")
+        .fetch_all(pool)
+        .await
+        .context("failed to read template_translations table schema")?;
+
+    let mut has_variables_json = false;
+    let mut has_name = false;
+
+    for row in rows {
+        let name: String = row.try_get("name")?;
+        match name.as_str() {
+            "variables_json" => has_variables_json = true,
+            "name" => has_name = true,
+            _ => {}
+        }
+    }
+
+    if !has_variables_json {
+        sqlx::query("ALTER TABLE template_translations ADD COLUMN variables_json TEXT;")
+            .execute(pool)
+            .await
+            .context("failed to add variables_json column to template_translations")?;
+    }
+
+    if !has_name {
+        sqlx::query("ALTER TABLE template_translations ADD COLUMN name TEXT;")
+            .execute(pool)
+            .await
+            .context("failed to add name column to template_translations")?;
+    }
 
     Ok(())
 }

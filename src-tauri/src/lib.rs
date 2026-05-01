@@ -2,6 +2,7 @@
 mod db;
 mod products;
 mod quotes;
+mod settings;
 mod templates;
 
 use tauri::Manager;
@@ -15,7 +16,10 @@ use quotes::{create_quote, get_quote, list_quotes};
 use templates::{
     create_template, delete_template, get_template, list_templates, render_template_preview,
     update_template,
+    get_template_translation, upsert_template_translation,
 };
+
+use settings::{get_setting, set_setting};
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -50,7 +54,11 @@ pub fn run() {
             create_template,
             update_template,
             delete_template,
-            render_template_preview
+            render_template_preview,
+            get_setting,
+            set_setting,
+            get_template_translation,
+            upsert_template_translation
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

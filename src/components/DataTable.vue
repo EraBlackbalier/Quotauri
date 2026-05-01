@@ -4,6 +4,7 @@ const props = defineProps({
   rows: { type: Array, required: true },
   rowKey: { type: [String, Function], default: "id" },
   loading: { type: Boolean, default: false },
+  loadingText: { type: String, default: "Cargando..." },
   emptyText: { type: String, default: "Sin registros." },
   clickable: { type: Boolean, default: false },
   selectedKey: { type: [String, Number, null], default: null },
@@ -25,7 +26,7 @@ function onRowClick(row, idx) {
 
 <template>
   <div class="dt">
-    <div v-if="loading" class="muted">Cargando...</div>
+    <div v-if="loading" class="muted">{{ loadingText }}</div>
     <div v-else-if="!rows.length" class="muted">{{ emptyText }}</div>
 
     <table v-else class="dt-table">

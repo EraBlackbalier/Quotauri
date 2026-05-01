@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import DataTable from "../components/DataTable.vue";
+import { t } from "../i18n";
 
 const loading = ref(false);
 const errorMsg = ref("");
@@ -20,12 +21,12 @@ const form = ref({
 
 const isEditing = computed(() => editingId.value !== null);
 
-const columns = [
-  { key: "name", label: "Nombre" },
-  { key: "sku", label: "SKU", width: "110px" },
-  { key: "price", label: "Precio", width: "160px" },
-  { key: "actions", label: "", width: "180px" },
-];
+const columns = computed(() => [
+  { key: "name", label: t("products.name") },
+  { key: "sku", label: t("products.sku"), width: "110px" },
+  { key: "price", label: t("products.price"), width: "160px" },
+  { key: "actions", label: t("products.actions"), width: "180px" },
+]);
 
 function formatMoney(cents) {
   const v = Number(cents || 0) / 100;
@@ -83,7 +84,7 @@ async function saveProduct() {
     };
 
     if (!payload.name.length) {
-      errorMsg.value = "El nombre es requerido";
+      errorMsg.value = t("products.nameRequired");
       return;
     }
 
@@ -106,7 +107,7 @@ async function saveProduct() {
 }
 
 async function removeProduct(p) {
-  if (!confirm(`Eliminar producto "${p.name}"?`)) return;
+  if (!confirm(t("products.deleteConfirm", p.name))) return;
   loading.value = true;
   errorMsg.value = "";
   try {
@@ -129,13 +130,13 @@ onMounted(async () => {
   <section>
     <div class="app-header">
       <div>
-        <h1>Productos</h1>
-        <p class="muted">Administra tu catálogo para cotizaciones.</p>
+        <h1>{{ t("products.title") }}</h1>
+        <p class="muted">{{ t("products.subtitle") }}</p>
       </div>
 
       <div class="header-actions">
-        <input v-model="search" class="search" placeholder="Buscar por nombre o SKU" @input="refreshProducts" />
-        <button type="button" @click="refreshProducts" :disabled="loading">Refrescar</button>
+        <input v-model="search" class="search" :placeholder="t('products.searchPlaceholder')" @input="refreshProducts" />
+        <button type="button" @click="refreshProducts" :disabled="loading">{{ t("common.refresh") }}</button>
       </div>
     </div>
 
@@ -143,47 +144,53 @@ onMounted(async () => {
 
     <div class="grid">
       <section class="card">
-        <div class="card-title">{{ isEditing ? "Editar producto" : "Nuevo producto" }}</div>
+        <div class="card-title">{{ isEditing ? t("products.formTitleEdit") : t("products.formTitleNew") }}</div>
 
         <form class="form" @submit.prevent="saveProduct">
           <label>
-            SKU
-            <input v-model="form.sku" placeholder="Opcional" />
+            {{ t("products.sku") }}
+            <input v-model="form.sku" :placeholder="t('products.skuOptional')" />
           </label>
 
           <label>
-            Nombre
-            <input v-model="form.name" placeholder="Ej. Servicio de diseño" />
+            {{ t("products.name") }}
+            <input v-model="form.name" :placeholder="t('products.namePlaceholder')" />
           </label>
 
           <label>
-            Descripción
-            <textarea v-model="form.description" rows="4" placeholder="Opcional" />
+            {{ t("products.description") }}
+            <textarea v-model="form.description" rows="4" :placeholder="t('products.skuOptional')" />
           </label>
 
           <div class="row-2">
             <label>
-              Precio (centavos)
+              {{ t("products.priceCents") }}
               <input v-model.number="form.unit_price_cents" type="number" min="0" />
             </label>
 
             <label>
-              Moneda
+              {{ t("products.currency") }}
               <input v-model="form.currency" placeholder="MXN" />
             </label>
           </div>
 
           <div class="actions">
-            <button type="submit" :disabled="loading">{{ isEditing ? "Guardar" : "Crear" }}</button>
-            <button type="button" class="secondary" @click="resetForm" :disabled="loading">Cancelar</button>
+            <button type="submit" :disabled="loading">{{ isEditing ? t("common.save") : t("common.create") }}</button>
+            <button type="button" class="secondary" @click="resetForm" :disabled="loading">{{ t("common.cancel") }}</button>
           </div>
         </form>
       </section>
 
       <section class="card">
-        <div class="card-title">Lista</div>
+        <div class="card-title">{{ t("products.listTitle") }}</div>
 
-        <DataTable :columns="columns" :rows="products" :loading="loading" empty-text="No hay productos.">
+        <DataTable
+          :columns="columns"
+          :rows="products"
+          :loading="loading"
+          :loading-text="t('common.loading')"
+          :empty-text="t('products.empty')"
+        >
           <template #cell-sku="{ row }">
             <span v-if="row.sku" class="pill">{{ row.sku }}</span>
             <span v-else class="muted">-</span>
@@ -193,8 +200,8 @@ onMounted(async () => {
 
           <template #cell-actions="{ row }">
             <div class="actions">
-              <button type="button" class="secondary" @click="startEdit(row)" :disabled="loading">Editar</button>
-              <button type="button" class="danger" @click="removeProduct(row)" :disabled="loading">Eliminar</button>
+              <button type="button" class="secondary" @click="startEdit(row)" :disabled="loading">{{ t("common.edit") }}</button>
+              <button type="button" class="danger" @click="removeProduct(row)" :disabled="loading">{{ t("common.delete") }}</button>
             </div>
           </template>
         </DataTable>

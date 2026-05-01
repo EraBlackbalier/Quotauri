@@ -1,7 +1,8 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import DataTable from "../components/DataTable.vue";
+import { SUPPORTED_LANGUAGES, language, t } from "../i18n";
 
 const templateLoading = ref(false);
 const templateErrorMsg = ref("");
@@ -12,10 +13,15 @@ const templateEditingId = ref(null);
 const templateForm = ref({
   name: "",
   accent_color: "#396cd8",
+  logo_data_url: "",
+});
+
+const translationLang = ref("es");
+const translationForm = ref({
+  name: "",
   header_html: "",
   body_html: "",
   footer_html: "",
-  logo_data_url: "",
 });
 
 const templateVariablesJson = ref(
@@ -40,11 +46,20 @@ let templatePreviewTimer = null;
 
 const isEditingTemplate = computed(() => templateEditingId.value !== null);
 
-const columns = [
-  { key: "name", label: "Nombre" },
-  { key: "updated_at", label: "Actualizado", width: "190px" },
+const columns = computed(() => [
+  { key: "name", label: t("templates.name") },
+  { key: "updated_at", label: t("templates.updatedAt"), width: "190px" },
   { key: "actions", label: "", width: "180px" },
-];
+]);
+
+function defaultTranslationFromBase() {
+  translationForm.value = {
+    name: "",
+    header_html: templateForm.value.header_html || "",
+    body_html: templateForm.value.body_html || "",
+    footer_html: templateForm.value.footer_html || "",
+  };
+}
 
 function resetTemplateForm() {
   templateEditingId.value = null;
@@ -57,7 +72,42 @@ function resetTemplateForm() {
     footer_html: "<small>Gracias por tu preferencia</small>",
     logo_data_url: "",
   };
+
+  defaultTranslationFromBase();
   scheduleTemplatePreview();
+}
+
+async function loadTemplateTranslation() {
+  if (!templateEditingId.value) return;
+  templateLoading.value = true;
+  templateErrorMsg.value = "";
+  try {
+    const langCode = String(translationLang.value || "").trim();
+    const existing = await invoke("get_template_translation", {
+      template_id: templateEditingId.value,
+      lang_code: langCode,
+    });
+
+    if (existing) {
+      translationForm.value = {
+        name: existing.name ?? "",
+        header_html: existing.header_html ?? templateForm.value.header_html ?? "",
+        body_html: existing.body_html ?? templateForm.value.body_html ?? "",
+        footer_html: existing.footer_html ?? templateForm.value.footer_html ?? "",
+      };
+      templateVariablesJson.value = existing.variables_json?.length
+        ? String(existing.variables_json)
+        : templateVariablesJson.value;
+    } else {
+      defaultTranslationFromBase();
+    }
+
+    scheduleTemplatePreview();
+  } catch (e) {
+    templateErrorMsg.value = String(e);
+  } finally {
+    templateLoading.value = false;
+  }
 }
 
 async function refreshTemplates() {
@@ -83,7 +133,8 @@ function startTemplateEdit(t) {
     footer_html: t.footer_html ?? "",
     logo_data_url: t.logo_data_url ?? "",
   };
-  scheduleTemplatePreview();
+  defaultTranslationFromBase();
+  loadTemplateTranslation();
 }
 
 async function saveTemplate() {
@@ -101,15 +152,33 @@ async function saveTemplate() {
     };
 
     if (!payload.name.length) {
-      templateErrorMsg.value = "El nombre es requerido";
+      templateErrorMsg.value = t("templates.nameRequired");
       return;
     }
 
+    let templateId = templateEditingId.value;
     if (isEditingTemplate.value) {
       await invoke("update_template", { id: templateEditingId.value, input: payload });
     } else {
-      await invoke("create_template", { input: payload });
+      const created = await invoke("create_template", { input: payload });
+      templateId = created?.id ?? created?.template?.id ?? created?.template_id ?? null;
+      templateEditingId.value = templateId;
     }
+
+    const langCode = String(translationLang.value || "").trim();
+    await invoke("upsert_template_translation", {
+      input: {
+        template_id: templateId,
+        lang_code: langCode,
+        name: translationForm.value.name.trim() ? translationForm.value.name.trim() : null,
+        header_html: translationForm.value.header_html.length ? translationForm.value.header_html : null,
+        body_html: translationForm.value.body_html.length ? translationForm.value.body_html : null,
+        footer_html: translationForm.value.footer_html.length ? translationForm.value.footer_html : null,
+        variables_json: String(templateVariablesJson.value || "").trim().length
+          ? String(templateVariablesJson.value || "")
+          : null,
+      },
+    });
 
     await refreshTemplates();
   } catch (e) {
@@ -120,7 +189,7 @@ async function saveTemplate() {
 }
 
 async function removeTemplate(t) {
-  if (!confirm(`Eliminar template "${t.name}"?`)) return;
+  if (!confirm(t("templates.deleteConfirm", t.name))) return;
   templateLoading.value = true;
   templateErrorMsg.value = "";
   try {
@@ -151,6 +220,17 @@ function parseVariablesJson() {
   return JSON.parse(raw);
 }
 
+function mergedForPreview() {
+  return {
+    name: translationForm.value.name.trim() ? translationForm.value.name.trim() : templateForm.value.name,
+    accent_color: templateForm.value.accent_color,
+    logo_data_url: templateForm.value.logo_data_url,
+    header_html: translationForm.value.header_html,
+    body_html: translationForm.value.body_html,
+    footer_html: translationForm.value.footer_html,
+  };
+}
+
 function scheduleTemplatePreview() {
   if (templatePreviewTimer) clearTimeout(templatePreviewTimer);
   templatePreviewTimer = setTimeout(async () => {
@@ -160,12 +240,12 @@ function scheduleTemplatePreview() {
       const variables = parseVariablesJson();
       templatePreviewHtml.value = await invoke("render_template_preview", {
         input: {
-          name: templateForm.value.name.trim() ? templateForm.value.name.trim() : null,
-          logo_data_url: templateForm.value.logo_data_url.trim() ? templateForm.value.logo_data_url.trim() : null,
-          accent_color: templateForm.value.accent_color.trim() ? templateForm.value.accent_color.trim() : null,
-          header_html: templateForm.value.header_html,
-          body_html: templateForm.value.body_html,
-          footer_html: templateForm.value.footer_html,
+          name: mergedForPreview().name.trim() ? mergedForPreview().name.trim() : null,
+          logo_data_url: mergedForPreview().logo_data_url.trim() ? mergedForPreview().logo_data_url.trim() : null,
+          accent_color: mergedForPreview().accent_color.trim() ? mergedForPreview().accent_color.trim() : null,
+          header_html: mergedForPreview().header_html,
+          body_html: mergedForPreview().body_html,
+          footer_html: mergedForPreview().footer_html,
           variables,
         },
       });
@@ -178,22 +258,37 @@ function scheduleTemplatePreview() {
 }
 
 onMounted(async () => {
+  translationLang.value = String(language.value || "es");
   resetTemplateForm();
   await refreshTemplates();
 });
+
+watch(
+  () => language.value,
+  (v) => {
+    translationLang.value = String(v || "es");
+  }
+);
+
+watch(
+  () => translationLang.value,
+  () => {
+    loadTemplateTranslation();
+  }
+);
 </script>
 
 <template>
   <section>
     <div class="app-header">
       <div>
-        <h1>Templates</h1>
-        <p class="muted">Edita HTML y previsualiza con variables.</p>
+        <h1>{{ t("templates.title") }}</h1>
+        <p class="muted">{{ t("templates.subtitle") }}</p>
       </div>
 
       <div class="header-actions">
-        <input v-model="templateSearch" class="search" placeholder="Buscar templates" @input="refreshTemplates" />
-        <button type="button" @click="refreshTemplates" :disabled="templateLoading">Refrescar</button>
+        <input v-model="templateSearch" class="search" :placeholder="t('templates.searchPlaceholder')" @input="refreshTemplates" />
+        <button type="button" @click="refreshTemplates" :disabled="templateLoading">{{ t("common.refresh") }}</button>
       </div>
     </div>
 
@@ -201,67 +296,87 @@ onMounted(async () => {
 
     <div class="grid-templates">
       <section class="card">
-        <div class="card-title">{{ isEditingTemplate ? "Editar template" : "Nuevo template" }}</div>
+        <div class="card-title">{{ isEditingTemplate ? t("templates.editTitle") : t("templates.newTitle") }}</div>
 
         <form class="form" @submit.prevent="saveTemplate">
           <label>
-            Nombre
+            {{ t("templates.name") }}
             <input v-model="templateForm.name" @input="scheduleTemplatePreview" />
           </label>
 
           <label>
-            Color acento
+            {{ t("templates.accent") }}
             <input v-model="templateForm.accent_color" @input="scheduleTemplatePreview" placeholder="#396cd8" />
           </label>
 
           <label>
-            Logo
+            {{ t("templates.logo") }}
             <input type="file" accept="image/*" @change="onLogoSelected" />
           </label>
 
           <label>
-            Header HTML
-            <textarea v-model="templateForm.header_html" rows="4" @input="scheduleTemplatePreview" />
+            {{ t("language.label") }}
+            <select v-model="translationLang" @change="scheduleTemplatePreview">
+              <option v-for="l in SUPPORTED_LANGUAGES" :key="`tl-${l.code}`" :value="l.code">
+                {{ l.label }}
+              </option>
+            </select>
           </label>
 
           <label>
-            Body HTML
-            <textarea v-model="templateForm.body_html" rows="8" @input="scheduleTemplatePreview" />
+            {{ t("templates.name") }} ({{ translationLang }})
+            <input v-model="translationForm.name" @input="scheduleTemplatePreview" :placeholder="templateForm.name" />
           </label>
 
           <label>
-            Footer HTML
-            <textarea v-model="templateForm.footer_html" rows="4" @input="scheduleTemplatePreview" />
+            {{ t("templates.headerHtml") }} ({{ translationLang }})
+            <textarea v-model="translationForm.header_html" rows="4" @input="scheduleTemplatePreview" />
           </label>
 
           <label>
-            Variables (JSON)
+            {{ t("templates.bodyHtml") }} ({{ translationLang }})
+            <textarea v-model="translationForm.body_html" rows="8" @input="scheduleTemplatePreview" />
+          </label>
+
+          <label>
+            {{ t("templates.footerHtml") }} ({{ translationLang }})
+            <textarea v-model="translationForm.footer_html" rows="4" @input="scheduleTemplatePreview" />
+          </label>
+
+          <label>
+            {{ t("templates.variablesJson") }} ({{ translationLang }})
             <textarea v-model="templateVariablesJson" rows="8" @input="scheduleTemplatePreview" />
           </label>
 
           <div class="actions">
-            <button type="submit" :disabled="templateLoading">{{ isEditingTemplate ? "Guardar" : "Crear" }}</button>
-            <button type="button" class="secondary" @click="resetTemplateForm" :disabled="templateLoading">Nuevo</button>
+            <button type="submit" :disabled="templateLoading">{{ isEditingTemplate ? t("common.save") : t("common.create") }}</button>
+            <button type="button" class="secondary" @click="resetTemplateForm" :disabled="templateLoading">{{ t("common.new") }}</button>
           </div>
         </form>
       </section>
 
       <section class="card">
-        <div class="card-title">Lista</div>
+        <div class="card-title">{{ t("templates.listTitle") }}</div>
 
-        <DataTable :columns="columns" :rows="templates" :loading="templateLoading" empty-text="No hay templates.">
+        <DataTable
+          :columns="columns"
+          :rows="templates"
+          :loading="templateLoading"
+          :loading-text="t('common.loading')"
+          :empty-text="t('templates.empty')"
+        >
           <template #cell-actions="{ row }">
             <div class="actions">
-              <button type="button" class="secondary" @click="startTemplateEdit(row)">Editar</button>
-              <button type="button" class="danger" @click="removeTemplate(row)">Eliminar</button>
+              <button type="button" class="secondary" @click="startTemplateEdit(row)">{{ t("common.edit") }}</button>
+              <button type="button" class="danger" @click="removeTemplate(row)">{{ t("common.delete") }}</button>
             </div>
           </template>
         </DataTable>
       </section>
 
       <section class="card">
-        <div class="card-title">Preview</div>
-        <div v-if="templateLoading" class="muted">Renderizando...</div>
+        <div class="card-title">{{ t("templates.previewTitle") }}</div>
+        <div v-if="templateLoading" class="muted">{{ t("templates.rendering") }}</div>
         <iframe class="preview" sandbox="allow-same-origin" :srcdoc="templatePreviewHtml"></iframe>
       </section>
     </div>
