@@ -118,7 +118,7 @@ WHERE template_id = ?1
     .map_err(|e| e.to_string())
 }
 
-fn render_html(input: RenderTemplateInput) -> Result<String, String> {
+pub(crate) fn render_html(input: RenderTemplateInput) -> Result<String, String> {
     let accent = input.accent_color.unwrap_or_else(|| "#396cd8".to_string());
 
     let mut variables = input.variables;

@@ -11,7 +11,9 @@ use products::{
     create_product, delete_product, get_product, list_products, update_product,
 };
 
-use quotes::{create_quote, get_quote, list_quotes};
+use quotes::{
+    create_quote, get_quote, list_quotes, export_quote_html, export_quote_pdf, render_quote_html,
+};
 
 use templates::{
     create_template, delete_template, get_template, list_templates, render_template_preview,
@@ -49,6 +51,9 @@ pub fn run() {
             list_quotes,
             get_quote,
             create_quote,
+            render_quote_html,
+            export_quote_html,
+            export_quote_pdf,
             list_templates,
             get_template,
             create_template,

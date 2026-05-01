@@ -1,7 +1,10 @@
 use crate::db::Db;
+use crate::templates::{render_html, RenderTemplateInput, Template, TemplateTranslation};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use sqlx::{FromRow, SqlitePool};
 use tauri::State;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, FromRow)]
 pub struct Quote {
@@ -19,6 +22,295 @@ pub struct Quote {
     pub updated_at: String,
     pub template_id: Option<i64>,
     pub currency: String,
+}
+
+fn format_money(cents: i64) -> String {
+    let v = (cents as f64) / 100.0;
+    format!("{:.2}", v)
+}
+
+async fn fetch_template_by_id(pool: &SqlitePool, id: i64) -> Result<Template, String> {
+    sqlx::query_as::<_, Template>(
+        r#"
+SELECT id,
+       name,
+       logo_path,
+       logo_data_url,
+       accent_color,
+       header_html,
+       body_html,
+       footer_html,
+       created_at,
+       updated_at
+FROM templates
+WHERE id = ?1
+"#,
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())
+}
+
+async fn fetch_latest_template(pool: &SqlitePool) -> Result<Template, String> {
+    sqlx::query_as::<_, Template>(
+        r#"
+SELECT id,
+       name,
+       logo_path,
+       logo_data_url,
+       accent_color,
+       header_html,
+       body_html,
+       footer_html,
+       created_at,
+       updated_at
+FROM templates
+ORDER BY updated_at DESC
+LIMIT 1
+"#,
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())
+}
+
+async fn fetch_template_translation(
+    pool: &SqlitePool,
+    template_id: i64,
+    lang_code: &str,
+) -> Result<Option<TemplateTranslation>, String> {
+    sqlx::query_as::<_, TemplateTranslation>(
+        r#"
+SELECT id,
+       template_id,
+       lang_code,
+       name,
+       header_html,
+       body_html,
+       footer_html,
+       variables_json,
+       created_at,
+       updated_at
+FROM template_translations
+WHERE template_id = ?1
+  AND lang_code = ?2
+"#,
+    )
+    .bind(template_id)
+    .bind(lang_code)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| e.to_string())
+}
+
+fn file_url_from_path(p: &std::path::Path) -> String {
+    let s = p.to_string_lossy().replace('\\', "/");
+    let s = s.replace(' ', "%20");
+    format!("file:///{}", s)
+}
+
+fn find_edge_exe() -> Option<std::path::PathBuf> {
+    let candidates = [
+        r#"C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe"#,
+        r#"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"#,
+    ];
+
+    for c in candidates {
+        let p = std::path::PathBuf::from(c);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    None
+}
+
+async fn render_quote_html_internal(
+    pool: &SqlitePool,
+    quote_id: i64,
+    lang_code: &str,
+) -> Result<String, String> {
+    let quote = fetch_quote(pool, quote_id).await?;
+    let items = fetch_quote_items(pool, quote_id).await?;
+
+    let template = if let Some(tid) = quote.template_id {
+        fetch_template_by_id(pool, tid).await?
+    } else {
+        fetch_latest_template(pool).await?
+    };
+
+    let translation = fetch_template_translation(pool, template.id, lang_code).await?;
+
+    let custom_vars: Value = if let Some(t) = &translation {
+        if let Some(raw) = &t.variables_json {
+            if raw.trim().is_empty() {
+                json!({})
+            } else {
+                serde_json::from_str(raw).map_err(|e| format!("invalid variables_json: {e}"))?
+            }
+        } else {
+            json!({})
+        }
+    } else {
+        json!({})
+    };
+
+    let quote_number_display = quote
+        .quote_number
+        .clone()
+        .unwrap_or_else(|| format!("Q-{:06}", quote.id));
+
+    let item_vars: Vec<Value> = items
+        .iter()
+        .map(|it| {
+            json!({
+              "sku": it.sku,
+              "name": it.name,
+              "description": it.description,
+              "quantity": it.quantity,
+              "unit_price_cents": it.unit_price_cents,
+              "unit_price": format_money(it.unit_price_cents),
+              "line_total_cents": it.line_total_cents,
+              "line_total": format_money(it.line_total_cents),
+              "currency": it.currency,
+            })
+        })
+        .collect();
+
+    let mut vars = match custom_vars {
+        Value::Object(m) => Value::Object(m),
+        _ => json!({}),
+    };
+
+    if let Value::Object(map) = &mut vars {
+        map.insert(
+            "quote".to_string(),
+            json!({
+              "id": quote.id,
+              "quote_number": quote.quote_number,
+              "quote_number_display": quote_number_display,
+              "customer_name": quote.customer_name,
+              "customer_email": quote.customer_email,
+              "notes": quote.notes,
+              "status": quote.status,
+              "created_at": quote.created_at,
+              "updated_at": quote.updated_at,
+              "subtotal_cents": quote.subtotal_cents,
+              "tax_rate_bps": quote.tax_rate_bps,
+              "tax_cents": quote.tax_cents,
+              "total_cents": quote.total_cents,
+              "subtotal": format_money(quote.subtotal_cents),
+              "tax": format_money(quote.tax_cents),
+              "total": format_money(quote.total_cents),
+              "currency": quote.currency,
+              "template_id": quote.template_id,
+              "lang_code": lang_code,
+            }),
+        );
+        map.insert("items".to_string(), Value::Array(item_vars));
+    }
+
+    let name = translation
+        .as_ref()
+        .and_then(|t| t.name.clone())
+        .unwrap_or_else(|| template.name.clone());
+
+    let header_html = translation
+        .as_ref()
+        .and_then(|t| t.header_html.clone())
+        .or_else(|| template.header_html.clone());
+    let body_html = translation
+        .as_ref()
+        .and_then(|t| t.body_html.clone())
+        .or_else(|| template.body_html.clone());
+    let footer_html = translation
+        .as_ref()
+        .and_then(|t| t.footer_html.clone())
+        .or_else(|| template.footer_html.clone());
+
+    let input = RenderTemplateInput {
+        name: Some(name),
+        logo_data_url: template.logo_data_url.clone(),
+        accent_color: template.accent_color.clone(),
+        header_html,
+        body_html,
+        footer_html,
+        variables: vars,
+    };
+
+    render_html(input)
+}
+
+#[tauri::command]
+pub async fn render_quote_html(
+    db: State<'_, Db>,
+    quote_id: i64,
+    lang_code: Option<String>,
+) -> Result<String, String> {
+    let pool = &db.0;
+    let lang = lang_code.unwrap_or_else(|| "es".to_string());
+    render_quote_html_internal(pool, quote_id, lang.trim()).await
+}
+
+#[tauri::command]
+pub async fn export_quote_html(
+    db: State<'_, Db>,
+    quote_id: i64,
+    lang_code: Option<String>,
+    output_path: String,
+) -> Result<(), String> {
+    let pool = &db.0;
+    let lang = lang_code.unwrap_or_else(|| "es".to_string());
+    let html = render_quote_html_internal(pool, quote_id, lang.trim()).await?;
+    std::fs::write(&output_path, html).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_quote_pdf(
+    db: State<'_, Db>,
+    quote_id: i64,
+    lang_code: Option<String>,
+    output_path: String,
+) -> Result<(), String> {
+    let pool = &db.0;
+    let lang = lang_code.unwrap_or_else(|| "es".to_string());
+    let html = render_quote_html_internal(pool, quote_id, lang.trim()).await?;
+
+    let mut tmp = std::env::temp_dir();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_millis();
+    tmp.push(format!("quotauri_quote_{quote_id}_{now}.html"));
+    std::fs::write(&tmp, html).map_err(|e| e.to_string())?;
+
+    let edge = find_edge_exe().ok_or_else(|| {
+        "Microsoft Edge not found. Install Edge or export HTML and print to PDF manually.".to_string()
+    })?;
+
+    let out = std::path::PathBuf::from(&output_path);
+    let url = file_url_from_path(&tmp);
+
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        std::process::Command::new(edge)
+            .arg("--headless")
+            .arg("--disable-gpu")
+            .arg(format!("--print-to-pdf={}", out.to_string_lossy()))
+            .arg("--no-pdf-header-footer")
+            .arg(url)
+            .status()
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+
+    let _ = std::fs::remove_file(&tmp);
+
+    if !status.success() {
+        return Err(format!("PDF generation failed with status: {status}"));
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]

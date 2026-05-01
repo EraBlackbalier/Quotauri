@@ -3,7 +3,9 @@ import { computed, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import DataTable from "../components/DataTable.vue";
 import ProductAutocomplete from "../components/ProductAutocomplete.vue";
-import { t } from "../i18n";
+import { save } from "@tauri-apps/api/dialog";
+import { open } from "@tauri-apps/plugin-opener";
+import { language, t } from "../i18n";
 
 const quoteLoading = ref(false);
 const quoteErrorMsg = ref("");
@@ -12,6 +14,8 @@ const quoteSearch = ref("");
 const quotes = ref([]);
 const selectedQuoteId = ref(null);
 const selectedQuote = ref(null);
+
+const exporting = ref(false);
 
 const quoteForm = ref({
   quote_number: "",
@@ -40,6 +44,58 @@ const quoteItemColumns = computed(() => [
 function formatMoney(cents) {
   const v = Number(cents || 0) / 100;
   return v.toFixed(2);
+}
+
+async function exportSelectedQuoteHtml() {
+  if (!selectedQuote.value?.quote?.id) return;
+  exporting.value = true;
+  quoteErrorMsg.value = "";
+  try {
+    const folio = selectedQuote.value.quote.quote_number || `Q-${selectedQuote.value.quote.id}`;
+    const path = await save({
+      defaultPath: `cotizacion-${folio}.html`,
+      filters: [{ name: "HTML", extensions: ["html"] }],
+    });
+    if (!path) return;
+
+    await invoke("export_quote_html", {
+      quote_id: selectedQuote.value.quote.id,
+      lang_code: language.value,
+      output_path: path,
+    });
+
+    await open(path);
+  } catch (e) {
+    quoteErrorMsg.value = String(e);
+  } finally {
+    exporting.value = false;
+  }
+}
+
+async function exportSelectedQuotePdf() {
+  if (!selectedQuote.value?.quote?.id) return;
+  exporting.value = true;
+  quoteErrorMsg.value = "";
+  try {
+    const folio = selectedQuote.value.quote.quote_number || `Q-${selectedQuote.value.quote.id}`;
+    const path = await save({
+      defaultPath: `cotizacion-${folio}.pdf`,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    if (!path) return;
+
+    await invoke("export_quote_pdf", {
+      quote_id: selectedQuote.value.quote.id,
+      lang_code: language.value,
+      output_path: path,
+    });
+
+    await open(path);
+  } catch (e) {
+    quoteErrorMsg.value = String(e);
+  } finally {
+    exporting.value = false;
+  }
 }
 
 const quoteSubtotalCents = computed(() => {
@@ -309,6 +365,15 @@ onMounted(async () => {
 
       <section class="card" v-if="selectedQuote">
         <div class="card-title">{{ t("quotes.detailTitle") }}</div>
+
+        <div class="actions" style="margin-bottom: 10px">
+          <button type="button" @click="exportSelectedQuotePdf" :disabled="quoteLoading || exporting">
+            {{ exporting ? t("quotes.exporting") : t("quotes.exportPdf") }}
+          </button>
+          <button type="button" class="secondary" @click="exportSelectedQuoteHtml" :disabled="quoteLoading || exporting">
+            {{ exporting ? t("quotes.exporting") : t("quotes.exportHtml") }}
+          </button>
+        </div>
 
         <div class="detail">
           <div class="detail-row">

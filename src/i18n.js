@@ -81,6 +81,10 @@ const translations = {
       emptyItems: "Sin items.",
       withoutCustomer: "(sin cliente)",
       addAtLeastOne: "Agrega al menos un producto",
+      exportPdf: "Exportar PDF",
+      exportHtml: "Exportar HTML",
+      exporting: "Exportando...",
+      exportDone: "Exportación lista",
     },
     templates: {
       title: "Templates",
@@ -178,6 +182,10 @@ const translations = {
       emptyItems: "No items.",
       withoutCustomer: "(no customer)",
       addAtLeastOne: "Add at least one product",
+      exportPdf: "Export PDF",
+      exportHtml: "Export HTML",
+      exporting: "Exporting...",
+      exportDone: "Export ready",
     },
     templates: {
       title: "Templates",
