@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "identifier": "quotauri",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev:tauri",
+    "devUrl": "http://localhost:18999",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },

@@ -66,6 +66,17 @@ pub struct RenderTemplateInput {
     pub variables: Value,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct TemplateDesign {
+    pub key: String,
+    pub name: String,
+    pub description: String,
+    pub accent_color: String,
+    pub header_html: String,
+    pub body_html: String,
+    pub footer_html: String,
+}
+
 async fn fetch_template(pool: &SqlitePool, id: i64) -> Result<Template, String> {
     sqlx::query_as::<_, Template>(
         r#"
@@ -238,6 +249,55 @@ LIMIT 200
         .await
         .map_err(|e| e.to_string())
     }
+}
+
+#[tauri::command]
+pub fn list_template_designs() -> Vec<TemplateDesign> {
+    crate::seed_templates::default_templates()
+        .into_iter()
+        .map(|template| TemplateDesign {
+            key: template.key.to_string(),
+            name: template.name.to_string(),
+            description: template.description.to_string(),
+            accent_color: template.accent_color.to_string(),
+            header_html: template.header_html.to_string(),
+            body_html: template.body_html.to_string(),
+            footer_html: template.footer_html.to_string(),
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub async fn apply_template_design(
+    db: State<'_, Db>,
+    id: i64,
+    design_key: String,
+) -> Result<Template, String> {
+    let pool = &db.0;
+    let design = crate::seed_templates::find_template_design(design_key.trim())
+        .ok_or_else(|| "template design not found".to_string())?;
+
+    sqlx::query(
+        r#"
+UPDATE templates
+SET accent_color = ?1,
+    header_html = ?2,
+    body_html = ?3,
+    footer_html = ?4,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?5
+"#,
+    )
+    .bind(design.accent_color)
+    .bind(design.header_html)
+    .bind(design.body_html)
+    .bind(design.footer_html)
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    fetch_template(pool, id).await
 }
 
 #[tauri::command]

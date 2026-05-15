@@ -26,3 +26,4 @@ sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-native-tls", "mac
 anyhow = "1"
 handlebars = "6"
 tauri-plugin-dialog = "2.7.0"
+chrono = { version = "0.4", features = ["serde"] }

@@ -5,6 +5,10 @@ mod quotes;
 mod seed_templates;
 mod settings;
 mod templates;
+#[allow(dead_code)]
+mod utils;
+mod analytics;
+mod export;
 
 use tauri::Manager;
 
@@ -20,9 +24,14 @@ use templates::{
     create_template, delete_template, get_template, list_templates, render_template_preview,
     update_template,
     get_template_translation, upsert_template_translation,
+    list_template_designs, apply_template_design,
 };
 
 use settings::{get_setting, set_setting};
+
+use analytics::{get_sales_stats, get_top_products, get_top_customers, get_monthly_revenue, get_quote_status_summary};
+
+use export::{export_data_json, export_quotes_csv, get_database_info};
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -57,6 +66,8 @@ pub fn run() {
             export_quote_html,
             export_quote_pdf,
             list_templates,
+            list_template_designs,
+            apply_template_design,
             get_template,
             create_template,
             update_template,
@@ -65,7 +76,15 @@ pub fn run() {
             get_setting,
             set_setting,
             get_template_translation,
-            upsert_template_translation
+            upsert_template_translation,
+            get_sales_stats,
+            get_top_products,
+            get_top_customers,
+            get_monthly_revenue,
+            get_quote_status_summary,
+            export_data_json,
+            export_quotes_csv,
+            get_database_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

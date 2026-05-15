@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import DataTable from "../components/DataTable.vue";
 import ProductAutocomplete from "../components/ProductAutocomplete.vue";
 import { save } from "@tauri-apps/plugin-dialog";
-import { open } from "@tauri-apps/plugin-opener";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { language, t } from "../i18n";
 
 const quoteLoading = ref(false);
@@ -59,12 +59,12 @@ async function exportSelectedQuoteHtml() {
     if (!path) return;
 
     await invoke("export_quote_html", {
-      quote_id: selectedQuote.value.quote.id,
-      lang_code: language.value,
-      output_path: path,
+      quoteId: selectedQuote.value.quote.id,
+      langCode: language.value,
+      outputPath: path,
     });
 
-    await open(path);
+    await openPath(path);
   } catch (e) {
     quoteErrorMsg.value = String(e);
   } finally {
@@ -85,12 +85,12 @@ async function exportSelectedQuotePdf() {
     if (!path) return;
 
     await invoke("export_quote_pdf", {
-      quote_id: selectedQuote.value.quote.id,
-      lang_code: language.value,
-      output_path: path,
+      quoteId: selectedQuote.value.quote.id,
+      langCode: language.value,
+      outputPath: path,
     });
 
-    await open(path);
+    await openPath(path);
   } catch (e) {
     quoteErrorMsg.value = String(e);
   } finally {

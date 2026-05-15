@@ -1,53 +1,53 @@
 <script setup>
- import { computed, onMounted, ref } from "vue";
- import ProductsView from "./views/ProductsView.vue";
- import QuotesView from "./views/QuotesView.vue";
- import TemplatesView from "./views/TemplatesView.vue";
- import {
-   SUPPORTED_LANGUAGES,
-   initLanguage,
-   language,
-   setLanguage,
-   t,
-   toggleLanguage,
- } from "./i18n";
- 
- const route = ref("products");
- const isDark = ref(false);
- 
- const routes = computed(() => [
-   { key: "products", label: t("nav.products"), component: ProductsView },
-   { key: "quotes", label: t("nav.quotes"), component: QuotesView },
-   { key: "templates", label: t("nav.templates"), component: TemplatesView },
- ]);
- 
- const currentComponent = computed(() => {
-   return routes.value.find((r) => r.key === route.value)?.component ?? ProductsView;
- });
- 
- function readRouteFromHash() {
-   const raw = String(window.location.hash || "").replace(/^#/, "").trim();
-   const hit = routes.value.find((r) => r.key === raw);
-   route.value = hit ? hit.key : "products";
- }
- 
- function navigate(to) {
-   if (!routes.value.some((r) => r.key === to)) return;
-   window.location.hash = to;
- }
+import { computed, onMounted, ref } from "vue";
+import ProductsView from "./views/ProductsView.vue";
+import QuotesView from "./views/QuotesView.vue";
+import TemplatesView from "./views/TemplatesView.vue";
+import {
+  SUPPORTED_LANGUAGES,
+  initLanguage,
+  language,
+  setLanguage,
+  t,
+  toggleLanguage,
+} from "./i18n";
 
- function onLanguageChange(evt) {
-   const next = evt?.target?.value;
-   setLanguage(next);
- }
+const route = ref("products");
+const isDark = ref(false);
  
- function applyTheme() {
-   const root = document.documentElement;
-   if (isDark.value) root.classList.add("dark");
-   else root.classList.remove("dark");
- }
+const routes = computed(() => [
+  { key: "products", label: t("nav.products"), component: ProductsView },
+  { key: "quotes", label: t("nav.quotes"), component: QuotesView },
+  { key: "templates", label: t("nav.templates"), component: TemplatesView },
+]);
  
- function toggleTheme() {
+const currentComponent = computed(() => {
+  return routes.value.find((r) => r.key === route.value)?.component ?? ProductsView;
+});
+
+function readRouteFromHash() {
+  const raw = String(window.location.hash || "").replace(/^#/, "").trim();
+  const hit = routes.value.find((r) => r.key === raw);
+  route.value = hit ? hit.key : "products";
+}
+
+function navigate(to) {
+  if (!routes.value.some((r) => r.key === to)) return;
+  window.location.hash = to;
+}
+
+function onLanguageChange(evt) {
+  const next = evt?.target?.value;
+  setLanguage(next);
+}
+ 
+function applyTheme() {
+  const root = document.documentElement;
+  if (isDark.value) root.classList.add("dark");
+  else root.classList.remove("dark");
+}
+
+function toggleTheme() {
    isDark.value = !isDark.value;
    window.localStorage.setItem("theme", isDark.value ? "dark" : "light");
    applyTheme();

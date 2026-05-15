@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:tauri": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/kill-tauri-ports.ps1 && vite",
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri"
