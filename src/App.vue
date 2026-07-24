@@ -71,7 +71,13 @@ function toggleTheme() {
   <main class="container">
     <div class="app-shell">
       <aside class="sidebar">
-        <div class="brand">Quotauri</div>
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true"><span>V</span></div>
+          <div>
+            <div class="brand">Vaestra</div>
+            <div class="brand-subtitle">Cotizador</div>
+          </div>
+        </div>
 
         <nav class="nav">
           <button
@@ -113,8 +119,36 @@ function toggleTheme() {
 </template>
 
 <style scoped>
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 4px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px 14px 14px 5px;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-size: 22px;
+  font-weight: 900;
+  background: linear-gradient(145deg, var(--brand-blue) 0 66%, var(--brand-red) 66% 100%);
+  box-shadow: 0 10px 22px rgba(11, 58, 130, .24);
+}
 .brand {
   font-weight: 800;
-  letter-spacing: 0.2px;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.brand-subtitle {
+  margin-top: 4px;
+  color: var(--brand-red);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
 }
 </style>

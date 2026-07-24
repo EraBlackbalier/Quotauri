@@ -12,6 +12,7 @@ const quoteErrorMsg = ref("");
 
 const quoteSearch = ref("");
 const quotes = ref([]);
+const templates = ref([]);
 const selectedQuoteId = ref(null);
 const selectedQuote = ref(null);
 
@@ -24,6 +25,7 @@ const quoteForm = ref({
   notes: "",
   tax_rate_bps: 1600,
   currency: "MXN",
+  template_id: null,
 });
 
 const quoteItems = ref([]);
@@ -98,6 +100,32 @@ async function exportSelectedQuotePdf() {
   }
 }
 
+async function exportSelectedQuoteWord() {
+  if (!selectedQuote.value?.quote?.id) return;
+  exporting.value = true;
+  quoteErrorMsg.value = "";
+  try {
+    const folio = selectedQuote.value.quote.quote_number || `Q-${selectedQuote.value.quote.id}`;
+    const path = await save({
+      defaultPath: `cotizacion-${folio}.docx`,
+      filters: [{ name: "Microsoft Word", extensions: ["docx"] }],
+    });
+    if (!path) return;
+
+    await invoke("export_quote_docx", {
+      quoteId: selectedQuote.value.quote.id,
+      langCode: language.value,
+      outputPath: path,
+    });
+
+    await openPath(path);
+  } catch (e) {
+    quoteErrorMsg.value = String(e);
+  } finally {
+    exporting.value = false;
+  }
+}
+
 const quoteSubtotalCents = computed(() => {
   return quoteItems.value.reduce((acc, it) => {
     const qty = Number(it.quantity || 0);
@@ -124,6 +152,7 @@ function resetQuoteBuilder() {
     notes: "",
     tax_rate_bps: 1600,
     currency: "MXN",
+    template_id: templates.value?.[0]?.id ?? null,
   };
   quoteItems.value = [];
 }
@@ -138,6 +167,17 @@ async function refreshQuotes() {
     quoteErrorMsg.value = String(e);
   } finally {
     quoteLoading.value = false;
+  }
+}
+
+async function refreshTemplates() {
+  try {
+    templates.value = await invoke("list_templates", { search: null });
+    if (!quoteForm.value.template_id && templates.value.length) {
+      quoteForm.value.template_id = templates.value[0].id;
+    }
+  } catch (e) {
+    quoteErrorMsg.value = String(e);
   }
 }
 
@@ -187,7 +227,7 @@ async function saveQuote() {
       tax_rate_bps: Number(quoteForm.value.tax_rate_bps || 0),
       currency: quoteForm.value.currency.trim() ? quoteForm.value.currency.trim() : null,
       status: "draft",
-      template_id: null,
+      template_id: quoteForm.value.template_id ? Number(quoteForm.value.template_id) : null,
       items: quoteItems.value.map((it) => ({
         product_id: it.product_id ?? null,
         sku: it.sku && String(it.sku).trim().length ? String(it.sku).trim() : null,
@@ -213,7 +253,7 @@ async function saveQuote() {
 }
 
 onMounted(async () => {
-  await refreshQuotes();
+  await Promise.all([refreshQuotes(), refreshTemplates()]);
 });
 </script>
 
@@ -271,7 +311,13 @@ onMounted(async () => {
               {{ t("products.currency") }}
               <input v-model="quoteForm.currency" placeholder="MXN" />
             </label>
-            <div></div>
+            <label>
+              {{ t("quotes.template") }}
+              <select v-model="quoteForm.template_id">
+                <option :value="null">{{ t("quotes.chooseTemplate") }}</option>
+                <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
+              </select>
+            </label>
           </div>
 
           <div class="card-title" style="margin-top: 8px">{{ t("quotes.addProducts") }}</div>
@@ -367,6 +413,9 @@ onMounted(async () => {
         <div class="card-title">{{ t("quotes.detailTitle") }}</div>
 
         <div class="actions" style="margin-bottom: 10px">
+          <button type="button" @click="exportSelectedQuoteWord" :disabled="quoteLoading || exporting">
+            {{ exporting ? t("quotes.exporting") : t("quotes.exportWord") }}
+          </button>
           <button type="button" @click="exportSelectedQuotePdf" :disabled="quoteLoading || exporting">
             {{ exporting ? t("quotes.exporting") : t("quotes.exportPdf") }}
           </button>

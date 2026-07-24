@@ -14,7 +14,7 @@ const selectedDesignKey = ref("");
 const templateEditingId = ref(null);
 const templateForm = ref({
   name: "",
-  accent_color: "#396cd8",
+  accent_color: "#0b3a82",
   logo_data_url: "",
 });
 
@@ -144,7 +144,7 @@ function resetTemplateForm() {
   templateEditingId.value = null;
   templateForm.value = {
     name: "",
-    accent_color: "#396cd8",
+    accent_color: "#0b3a82",
     header_html: "",
     body_html: "",
     footer_html: "",
@@ -204,7 +204,9 @@ async function refreshTemplates() {
 async function refreshTemplateDesigns() {
   try {
     templateDesigns.value = await invoke("list_template_designs");
-    selectedDesignKey.value = templateDesigns.value?.[0]?.key ?? "";
+    selectedDesignKey.value = templateDesigns.value.find((design) => design.key === "vaestra-signature")?.key
+      ?? templateDesigns.value?.[0]?.key
+      ?? "";
   } catch (e) {
     templateErrorMsg.value = String(e);
   }
@@ -244,7 +246,7 @@ function startTemplateEdit(t) {
   templateEditingId.value = t.id;
   templateForm.value = {
     name: t.name ?? "",
-    accent_color: t.accent_color ?? "#396cd8",
+    accent_color: t.accent_color ?? "#0b3a82",
     header_html: t.header_html ?? "",
     body_html: t.body_html ?? "",
     footer_html: t.footer_html ?? "",
@@ -440,7 +442,7 @@ watch(
 
           <label>
             {{ t("templates.accent") }}
-            <input v-model="templateForm.accent_color" @input="scheduleTemplatePreview" placeholder="#396cd8" />
+            <input v-model="templateForm.accent_color" @input="scheduleTemplatePreview" placeholder="#0b3a82" />
           </label>
 
           <label>

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    tauri_aquotauri_lib::run()
+    vaestra_cotizador_lib::run()
 }

@@ -13,7 +13,7 @@ pub fn db_path(handle: &tauri::AppHandle) -> anyhow::Result<PathBuf> {
     std::fs::create_dir_all(&dir)
         .with_context(|| format!("failed to create app data dir: {}", dir.display()))?;
 
-    dir.push("quotauri.sqlite3");
+    dir.push("vaestra-cotizador.sqlite3");
     Ok(dir)
 }
 

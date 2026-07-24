@@ -9,6 +9,7 @@ mod templates;
 mod utils;
 mod analytics;
 mod export;
+mod word_export;
 
 use tauri::Manager;
 
@@ -17,7 +18,7 @@ use products::{
 };
 
 use quotes::{
-    create_quote, get_quote, list_quotes, export_quote_html, export_quote_pdf, render_quote_html,
+    create_quote, get_quote, list_quotes, export_quote_docx, export_quote_html, export_quote_pdf, render_quote_html,
 };
 
 use templates::{
@@ -65,6 +66,7 @@ pub fn run() {
             render_quote_html,
             export_quote_html,
             export_quote_pdf,
+            export_quote_docx,
             list_templates,
             list_template_designs,
             apply_template_design,

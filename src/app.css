@@ -3,22 +3,28 @@ html, body, #app { width: 100%; height: 100%; margin: 0; padding: 0; }
 
 :root {
   font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
-  --bg: #f3f6fb;
-  --bg-2: #eaf0f9;
-  --text: #162033;
-  --muted: #5f6b7f;
+  --brand-blue: #0b3a82;
+  --brand-blue-bright: #1261c9;
+  --brand-red: #d51f3a;
+  --bg: #f4f7fc;
+  --bg-2: #e9eff9;
+  --text: #12213a;
+  --muted: #60708a;
   --card: rgba(255, 255, 255, 0.92);
   --card-strong: #ffffff;
-  --border: #d6dfec;
-  --border-strong: #bdcadc;
-  --accent: #1e6bd6;
-  --accent-soft: #e5f0ff;
-  --danger: #bd2038;
-  --danger-soft: #ffe6ea;
-  --shadow: 0 12px 36px rgba(17, 39, 73, 0.12);
+  --border: #d5deec;
+  --border-strong: #b8c7dc;
+  --accent: var(--brand-blue);
+  --accent-soft: #e3edfc;
+  --danger: var(--brand-red);
+  --danger-soft: #fde8ec;
+  --shadow: 0 14px 38px rgba(11, 58, 130, 0.11);
 }
 
 :root.dark {
+  --brand-blue: #69a7ff;
+  --brand-blue-bright: #8cbcff;
+  --brand-red: #ff657b;
   --bg: #0e1727;
   --bg-2: #0a1220;
   --text: #ebf2ff;
@@ -37,8 +43,8 @@ html, body, #app { width: 100%; height: 100%; margin: 0; padding: 0; }
 body {
   color: var(--text);
   background:
-    radial-gradient(circle at 8% -15%, #c7ddff 0%, transparent 40%),
-    radial-gradient(circle at 85% -10%, #d9f1f3 0%, transparent 34%),
+    radial-gradient(circle at 7% -12%, rgba(18, 97, 201, .22) 0%, transparent 38%),
+    radial-gradient(circle at 90% -15%, rgba(213, 31, 58, .16) 0%, transparent 34%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
 }
 
@@ -48,7 +54,8 @@ body {
 .sidebar {
   padding: 22px 16px;
   border-right: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--card) 0%, var(--card-strong) 100%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card) 97%, var(--brand-blue)) 0%, var(--card-strong) 100%);
   backdrop-filter: blur(6px);
   display: flex; flex-direction: column; gap: 14px;
 }
@@ -61,14 +68,24 @@ body {
   transition: all .18s ease;
 }
 .nav-btn[data-active="true"] {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--brand-blue) 60%, var(--border));
+  background: linear-gradient(90deg, var(--accent-soft), color-mix(in srgb, var(--danger-soft) 44%, var(--card)));
+  box-shadow: inset 4px 0 0 var(--brand-red);
   font-weight: 700;
 }
 .sidebar-footer { margin-top: auto; padding-top: 10px; }
 
 .content { padding: 24px; overflow: auto; }
 h1 { margin: 0; font-size: 30px; line-height: 1.1; }
+h1::after {
+  content: "";
+  display: block;
+  width: 52px;
+  height: 4px;
+  margin-top: 10px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--brand-blue) 0 68%, var(--brand-red) 68% 100%);
+}
 a { color: var(--accent); text-decoration: none; }
 
 input, button, textarea, select {
@@ -85,6 +102,12 @@ input, button, textarea, select {
 input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 textarea { resize: vertical; }
 button { cursor: pointer; width: auto; transition: all .16s ease; }
+button:not(.secondary):not(.danger):not(.nav-btn) {
+  color: #fff;
+  border-color: var(--brand-blue);
+  background: linear-gradient(135deg, var(--brand-blue), var(--brand-blue-bright));
+  box-shadow: 0 7px 16px rgba(11, 58, 130, .18);
+}
 button:hover { border-color: var(--accent); transform: translateY(-1px); }
 
 .app-header {
@@ -104,13 +127,14 @@ button:hover { border-color: var(--accent); transform: translateY(-1px); }
   border-radius: 16px;
   padding: 16px;
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
-.card-title { font-weight: 700; margin-bottom: 12px; }
+.card-title { font-weight: 800; margin-bottom: 12px; color: var(--brand-blue); }
 .form { display: flex; flex-direction: column; gap: 10px; }
 label { display: flex; flex-direction: column; gap: 6px; font-size: .88rem; color: var(--muted); }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.secondary { background: transparent; }
+.secondary { background: transparent; color: var(--brand-blue); }
 .danger { border-color: color-mix(in srgb, var(--danger) 46%, var(--border)); color: var(--danger); }
 .pill {
   font-size: .72rem; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--border-strong); color: var(--muted);

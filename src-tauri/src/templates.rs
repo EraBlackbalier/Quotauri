@@ -132,7 +132,7 @@ WHERE template_id = ?1
 pub(crate) fn render_html(input: RenderTemplateInput) -> Result<String, String> {
     let accent = input.accent_color.unwrap_or_else(|| "#396cd8".to_string());
     let logo_data_url = input.logo_data_url.unwrap_or_default();
-    let title = input.name.unwrap_or_else(|| "Quotauri".to_string());
+    let title = input.name.unwrap_or_else(|| "Vaestra Cotizador".to_string());
 
     let mut variables = input.variables;
     if variables.is_null() {

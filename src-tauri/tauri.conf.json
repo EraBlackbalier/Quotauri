@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-aquotauri",
+  "productName": "Vaestra Cotizador",
   "version": "0.1.0",
-  "identifier": "quotauri",
+  "identifier": "com.vaestra.cotizador",
   "build": {
     "beforeDevCommand": "npm run dev:tauri",
     "devUrl": "http://localhost:18999",
@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "tauri-aquotauri",
-        "width": 800,
-        "height": 600
+        "title": "Vaestra Cotizador",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 960,
+        "minHeight": 640
       }
     ],
     "security": {

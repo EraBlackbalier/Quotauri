@@ -281,7 +281,7 @@ pub async fn export_quote_pdf(
         .duration_since(UNIX_EPOCH)
         .map_err(|e| e.to_string())?
         .as_millis();
-    tmp.push(format!("quotauri_quote_{quote_id}_{now}.html"));
+    tmp.push(format!("vaestra_quote_{quote_id}_{now}.html"));
     std::fs::write(&tmp, html).map_err(|e| e.to_string())?;
 
     let edge = find_edge_exe().ok_or_else(|| {
@@ -313,6 +313,31 @@ pub async fn export_quote_pdf(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn export_quote_docx(
+    db: State<'_, Db>,
+    quote_id: i64,
+    lang_code: Option<String>,
+    output_path: String,
+) -> Result<(), String> {
+    let pool = &db.0;
+    let quote = fetch_quote(pool, quote_id).await?;
+    let items = fetch_quote_items(pool, quote_id).await?;
+    let template = if let Some(template_id) = quote.template_id {
+        fetch_template_by_id(pool, template_id).await?
+    } else {
+        fetch_latest_template(pool).await?
+    };
+    let lang = lang_code.unwrap_or_else(|| "es".to_string());
+    crate::word_export::write_quote_docx(
+        std::path::Path::new(&output_path),
+        &quote,
+        &items,
+        &template,
+        lang.trim(),
+    )
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]
